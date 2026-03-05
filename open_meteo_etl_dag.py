@@ -9,8 +9,7 @@ from airflow.operators.python import PythonOperator
 from airflow.models import Variable
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 
-OPEN_METEO_URL="https://api.open-meteo.com/v1/forecast"
-
+OPEN_METEO_URL="https://api.open-meteo.com/v1/forecast" 
 
 def _ensure_column(cur, table_fqn: str, col_name: str, col_type: str) -> None:
     cur.execute(f"DESC TABLE {table_fqn};")
@@ -20,33 +19,32 @@ def _ensure_column(cur, table_fqn: str, col_name: str, col_type: str) -> None:
 
 
 def etl_open_meteo_to_weather_data():
-    raw_locations= Variable.get("OM_LOCATIONS")
-    locations =json.loads(raw_locations)
+    raw_locations= Variable.get("OM_LOCATIONS") 
+    locations =json.loads(raw_locations) 
     if not isinstance(locations, list) or len(locations) < 2:
         raise ValueError("OM_LOCATIONS must be a JSON LIST with at least 2 locations.")
 
-    stage_name=Variable.get("SF_STAGE")            # e.g. RAW.STAGE_
+    stage_name=Variable.get("SF_STAGE") 
 
     hook =SnowflakeHook(snowflake_conn_id="snowflake_lab1")
     conn =hook.get_conn()
-    cur= conn.cursor()
+    cur= conn.cursor() 
 
     try:
-        cur.execute("USE ROLE TRAINING_ROLE;")
-        cur.execute("USE WAREHOUSE BLUEJAY;")
+        cur.execute("USE ROLE TRAINING_ROLE;") 
+        cur.execute("USE WAREHOUSE BLUEJAY;") 
         cur.execute("USE DATABASE USER_DB_BLUEJAY;")
         cur.execute("USE SCHEMA RAW;")
 
-        # Ensure required columns exist in final + staging
         for col,typ in [
             ("LOCATION_NAME", "STRING"),
-            ("CITY", "STRING"),
+            ("CITY", "STRING"), 
             ("LATITUDE","FLOAT"),
             ("LONGITUDE","FLOAT"),
             ("TEMP_MEAN","FLOAT"),
         ]:
-            _ensure_column(cur, "RAW.WEATHER_DATA", col, typ)
-            _ensure_column(cur, "RAW.WEATHER_DAILY", col, typ)
+            _ensure_column(cur, "RAW.WEATHER_DATA", col, typ) 
+            _ensure_column(cur, "RAW.WEATHER_DAILY", col, typ) 
 
         for loc in locations:
             location_name =loc["location_name"]
@@ -97,7 +95,7 @@ def etl_open_meteo_to_weather_data():
             safe_name =location_name.replace(" ", "_").replace(",", "")
             tmp_path= f"/tmp/open_meteo_{safe_name}.csv"
             df.to_csv(tmp_path,index=False)
-            staged_file= os.path.basename(tmp_path) + ".gz"  # AUTO_COMPRESS=TRUE
+            staged_file= os.path.basename(tmp_path) + ".gz" 
             staged_pattern= ".*" + staged_file.replace(".", "\\.") + "$"
 
             try:
@@ -126,9 +124,8 @@ def etl_open_meteo_to_weather_data():
                     DELETE FROM RAW.WEATHER_DATA
                     WHERE LOCATION_NAME = %s
                       AND DATE >= DATEADD('day', -90, CURRENT_DATE());
-                """, (location_name,))
+                """, (location_name,)) 
 
-                # Merge staging -> final
                 cur.execute("""
                     MERGE INTO RAW.WEATHER_DATA t
                     USING RAW.WEATHER_DAILY s
